@@ -109,14 +109,13 @@ function SOSScreen({ contacts, onClose }: { contacts: Contact[]; onClose: () => 
 
 // ─── Home Tab ─────────────────────────────────────────────────────────────
 function HomeTab({
-  seizures, medications, contacts, onSOS
+  seizures, contacts
 }: {
   seizures: Seizure[];
   medications: Medication[];
   contacts: Contact[];
   onSOS: () => void;
 }) {
-  const today = new Date().toISOString().split("T")[0];
   const thisMonth = new Date().toISOString().slice(0, 7);
   const monthSeizures = seizures.filter(s => s.date.startsWith(thisMonth));
   const sorted = [...seizures].sort((a, b) => b.date.localeCompare(a.date));
@@ -126,19 +125,18 @@ function HomeTab({
     ? Math.floor((Date.now() - new Date(lastSeizure.date).getTime()) / 86400000)
     : null;
 
-  const todayMeds = medications.flatMap(m =>
-    m.times.map(t => ({ med: m, time: t, taken: m.taken[`${today}_${t}`] || false }))
-  ).sort((a, b) => a.time.localeCompare(b.time));
+  // Гистограмма по годам
+  const yearCounts: Record<string, number> = {};
+  seizures.forEach(s => {
+    const year = s.date.slice(0, 4);
+    yearCounts[year] = (yearCounts[year] || 0) + 1;
+  });
+  const years = Object.keys(yearCounts).sort();
+  const maxCount = Math.max(...Object.values(yearCounts), 1);
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <button
-        onClick={onSOS}
-        className="w-full sos-btn rounded-3xl py-6 text-2xl font-golos font-bold shadow-lg animate-pulse-sos active:scale-95 transition-transform"
-      >
-        🆘 ЭКСТРЕННАЯ ПОМОЩЬ
-      </button>
-
+      {/* Статистика */}
       <div className="grid grid-cols-2 gap-3">
         <div className="card-calm p-4 text-center">
           <div className="text-3xl font-golos font-bold text-primary">
@@ -154,31 +152,67 @@ function HomeTab({
         </div>
       </div>
 
+      {/* Гистограмма частоты приступов по годам */}
       <div className="card-calm p-4">
-        <h3 className="font-golos font-semibold mb-3 flex items-center gap-2">
-          <Icon name="Pill" size={18} className="text-primary" />
-          Лекарства сегодня
+        <h3 className="font-golos font-semibold mb-4 flex items-center gap-2">
+          <Icon name="BarChart2" size={18} className="text-primary" />
+          Частота приступов
         </h3>
-        {todayMeds.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Нет назначенных лекарств</p>
+        {years.length === 0 ? (
+          <div className="text-center py-6 text-muted-foreground text-sm">
+            Добавьте записи в дневник, чтобы увидеть график
+          </div>
         ) : (
-          <div className="space-y-2">
-            {todayMeds.map(({ med, time, taken }) => (
-              <div key={`${med.id}_${time}`} className={`flex items-center justify-between p-3 rounded-xl transition-colors ${taken ? "bg-green-500/10 border border-green-500/20" : "bg-muted/50"}`}>
-                <div>
-                  <div className="font-medium text-sm">{med.name}</div>
-                  <div className="text-xs text-muted-foreground">{med.dose} · {time}</div>
-                </div>
-                {taken
-                  ? <Icon name="CheckCircle" size={20} className="text-green-500" />
-                  : <Icon name="Clock" size={20} className="text-muted-foreground" />
-                }
+          <div className="space-y-3">
+            {/* Y-axis labels + bars */}
+            <div className="flex gap-3">
+              {/* Y-axis */}
+              <div className="flex flex-col justify-between text-right" style={{ minWidth: "28px", height: "140px" }}>
+                <span className="text-xs text-muted-foreground">{maxCount}</span>
+                <span className="text-xs text-muted-foreground">{Math.round(maxCount / 2)}</span>
+                <span className="text-xs text-muted-foreground">0</span>
               </div>
-            ))}
+              {/* Bars area */}
+              <div className="flex-1 relative">
+                {/* Grid lines */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none" style={{ height: "140px" }}>
+                  {[0, 1, 2].map(i => (
+                    <div key={i} className="w-full border-t border-border/40" />
+                  ))}
+                </div>
+                {/* Bars */}
+                <div className="flex items-end gap-2 justify-around" style={{ height: "140px" }}>
+                  {years.map(year => {
+                    const count = yearCounts[year];
+                    const heightPct = (count / maxCount) * 100;
+                    return (
+                      <div key={year} className="flex flex-col items-center gap-1 flex-1">
+                        <span className="text-xs font-medium text-primary">{count}</span>
+                        <div className="w-full flex items-end" style={{ height: "108px" }}>
+                          <div
+                            className="w-full rounded-t-lg bg-primary transition-all duration-500"
+                            style={{ height: `${heightPct}%`, minHeight: "4px" }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            {/* X-axis labels */}
+            <div className="flex justify-around pl-10">
+              {years.map(year => (
+                <div key={year} className="flex-1 text-center text-xs text-muted-foreground font-medium">
+                  {year}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
+      {/* Последний приступ */}
       {lastSeizure && (
         <div className="card-calm p-4">
           <h3 className="font-golos font-semibold mb-2 flex items-center gap-2">
@@ -192,6 +226,7 @@ function HomeTab({
         </div>
       )}
 
+      {/* Экстренные контакты */}
       {contacts.length > 0 && (
         <div className="card-calm p-4">
           <h3 className="font-golos font-semibold mb-3 flex items-center gap-2">
