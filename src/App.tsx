@@ -116,14 +116,32 @@ function HomeTab({
   contacts: Contact[];
   onSOS: () => void;
 }) {
-  const thisMonth = new Date().toISOString().slice(0, 7);
-  const monthSeizures = seizures.filter(s => s.date.startsWith(thisMonth));
-  const sorted = [...seizures].sort((a, b) => b.date.localeCompare(a.date));
-  const lastSeizure = sorted[0];
+  const sorted = [...seizures].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  const lastSeizure = sorted[sorted.length - 1];
 
+  // Текущий период без приступов (дней с последнего)
   const daysSince = lastSeizure
     ? Math.floor((Date.now() - new Date(lastSeizure.date).getTime()) / 86400000)
     : null;
+
+  // Максимальный интервал между приступами
+  let maxGap: number | null = null;
+  if (sorted.length >= 2) {
+    for (let i = 1; i < sorted.length; i++) {
+      const gap = Math.floor(
+        (new Date(sorted[i].date).getTime() - new Date(sorted[i - 1].date).getTime()) / 86400000
+      );
+      if (maxGap === null || gap > maxGap) maxGap = gap;
+    }
+  }
+
+  // Среднее время между приступами
+  let avgGap: number | null = null;
+  if (sorted.length >= 2) {
+    const totalDays =
+      (new Date(sorted[sorted.length - 1].date).getTime() - new Date(sorted[0].date).getTime()) / 86400000;
+    avgGap = Math.round(totalDays / (sorted.length - 1));
+  }
 
   // Гистограмма по годам
   const yearCounts: Record<string, number> = {};
@@ -136,19 +154,31 @@ function HomeTab({
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Статистика */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="card-calm p-4 text-center">
-          <div className="text-3xl font-golos font-bold text-primary">
-            {daysSince !== null ? daysSince : "—"}
+      {/* Счётчик безприступного периода */}
+      <div className="card-calm p-4">
+        <h3 className="font-golos font-semibold mb-3 flex items-center gap-2">
+          <Icon name="ShieldCheck" size={18} className="text-primary" />
+          Безприступный период
+        </h3>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-muted/50 rounded-2xl p-3 text-center">
+            <div className="text-2xl font-golos font-bold text-primary leading-tight">
+              {daysSince !== null ? daysSince : "—"}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1 leading-snug">сейчас<br/>дней</div>
           </div>
-          <div className="text-xs text-muted-foreground mt-1">дней без приступа</div>
-        </div>
-        <div className="card-calm p-4 text-center">
-          <div className="text-3xl font-golos font-bold text-primary">
-            {monthSeizures.length}
+          <div className="bg-muted/50 rounded-2xl p-3 text-center">
+            <div className="text-2xl font-golos font-bold text-primary leading-tight">
+              {maxGap !== null ? maxGap : "—"}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1 leading-snug">макс.<br/>дней</div>
           </div>
-          <div className="text-xs text-muted-foreground mt-1">приступов за месяц</div>
+          <div className="bg-muted/50 rounded-2xl p-3 text-center">
+            <div className="text-2xl font-golos font-bold text-primary leading-tight">
+              {avgGap !== null ? avgGap : "—"}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1 leading-snug">среднее<br/>дней</div>
+          </div>
         </div>
       </div>
 
