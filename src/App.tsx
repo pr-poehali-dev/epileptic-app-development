@@ -42,6 +42,17 @@ interface Profile {
   weight: string;
 }
 
+type NotifCategory = "reminder" | "warning" | "recommendation" | "report" | "system";
+
+interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  category: NotifCategory;
+  date: string;
+  read: boolean;
+}
+
 // ─── Constants ─────────────────────────────────────────────────────────────
 const SEIZURE_TYPES = ["Генерализованный тонико-клонический", "Абсанс", "Фокальный", "Миоклонический", "Атонический", "Другой"];
 const TRIGGER_OPTIONS = ["Стресс", "Усталость", "Нарушение сна", "Яркий свет", "Мерцание", "Алкоголь", "Пропуск лекарства", "Менструация", "Жара", "Громкие звуки"];
@@ -728,6 +739,226 @@ function LearnTab() {
   );
 }
 
+// ─── Notifications Screen ──────────────────────────────────────────────────
+const CATEGORY_LABELS: Record<NotifCategory, string> = {
+  reminder: "Напоминание",
+  warning: "Предупреждение",
+  recommendation: "Рекомендация",
+  report: "Сводка",
+  system: "Система",
+};
+
+const CATEGORY_COLORS: Record<NotifCategory, string> = {
+  reminder: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  recommendation: "bg-green-500/10 text-green-600 dark:text-green-400",
+  report: "bg-primary/10 text-primary",
+  system: "bg-muted text-muted-foreground",
+};
+
+const CATEGORY_ICONS: Record<NotifCategory, string> = {
+  reminder: "Clock",
+  warning: "AlertTriangle",
+  recommendation: "Lightbulb",
+  report: "BarChart2",
+  system: "Bell",
+};
+
+const FILTER_OPTIONS: { id: NotifCategory | "all" | "unread"; label: string }[] = [
+  { id: "all", label: "Все" },
+  { id: "unread", label: "Непрочитанные" },
+  { id: "reminder", label: "Напоминания" },
+  { id: "warning", label: "Предупреждения" },
+  { id: "recommendation", label: "Рекомендации" },
+  { id: "report", label: "Сводки" },
+  { id: "system", label: "Системные" },
+];
+
+const DEFAULT_NOTIFICATIONS: AppNotification[] = [
+  {
+    id: "n1",
+    title: "Пора принять лекарство",
+    body: "Напоминаем о приёме Карбамазепина 200 мг. Не пропускайте дозы — это снижает риск приступов.",
+    category: "reminder",
+    date: new Date(Date.now() - 30 * 60000).toISOString(),
+    read: false,
+  },
+  {
+    id: "n2",
+    title: "Выявлен опасный триггер",
+    body: "За последние 7 дней вы отмечали стресс в 3 из 4 записей. Постарайтесь уделить время отдыху и расслаблению.",
+    category: "warning",
+    date: new Date(Date.now() - 3 * 3600000).toISOString(),
+    read: false,
+  },
+  {
+    id: "n3",
+    title: "Не забудьте заполнить дневник",
+    body: "Вы не вносили записи уже 2 дня. Регулярный дневник помогает выявить паттерны приступов.",
+    category: "reminder",
+    date: new Date(Date.now() - 6 * 3600000).toISOString(),
+    read: false,
+  },
+  {
+    id: "n4",
+    title: "Совет: нормализуйте сон",
+    body: "Недосыпание — один из главных триггеров эпилепсии. Старайтесь спать не менее 7–9 часов каждую ночь и придерживаться режима.",
+    category: "recommendation",
+    date: new Date(Date.now() - 24 * 3600000).toISOString(),
+    read: true,
+  },
+  {
+    id: "n5",
+    title: "Еженедельная сводка",
+    body: "За прошедшую неделю: приступов — 0, лекарства приняты в 93% случаев. Отличный результат, продолжайте в том же духе!",
+    category: "report",
+    date: new Date(Date.now() - 2 * 86400000).toISOString(),
+    read: true,
+  },
+  {
+    id: "n6",
+    title: "Рекомендация: избегайте мерцающего света",
+    body: "У части людей с эпилепсией приступы провоцирует фотостимуляция. Ограничьте время за экранами с мерцанием, используйте очки с фильтром.",
+    category: "recommendation",
+    date: new Date(Date.now() - 3 * 86400000).toISOString(),
+    read: true,
+  },
+  {
+    id: "n7",
+    title: "Ежемесячный отчёт готов",
+    body: "Февраль 2026: зафиксировано 2 приступа (-1 по сравнению с прошлым месяцем). Средний интервал между приступами — 14 дней.",
+    category: "report",
+    date: new Date(Date.now() - 7 * 86400000).toISOString(),
+    read: true,
+  },
+  {
+    id: "n8",
+    title: "Обновление приложения",
+    body: "Выпущена новая версия ЭпиКонтроль. Добавлены раздел аналитики триггеров и улучшен экран SOS.",
+    category: "system",
+    date: new Date(Date.now() - 10 * 86400000).toISOString(),
+    read: true,
+  },
+];
+
+function formatRelativeDate(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins} мин назад`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} ч назад`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} дн назад`;
+  return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
+
+function NotificationsScreen({
+  notifications, setNotifications, onClose,
+}: {
+  notifications: AppNotification[];
+  setNotifications: (v: AppNotification[] | ((p: AppNotification[]) => AppNotification[])) => void;
+  onClose: () => void;
+}) {
+  const [filter, setFilter] = useState<NotifCategory | "all" | "unread">("all");
+
+  const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const markRead = (id: string) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  const deleteNotif = (id: string) => setNotifications(prev => prev.filter(n => n.id !== id));
+
+  const filtered = notifications.filter(n => {
+    if (filter === "all") return true;
+    if (filter === "unread") return !n.read;
+    return n.category === filter;
+  });
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  return (
+    <div className="fixed inset-0 z-40 bg-background flex flex-col max-w-md mx-auto animate-fade-in">
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/50 px-4 py-3 flex items-center gap-3">
+        <button onClick={onClose} className="p-2 rounded-xl hover:bg-muted transition-colors">
+          <Icon name="ChevronLeft" size={20} className="text-muted-foreground" />
+        </button>
+        <h1 className="font-golos font-bold text-lg flex-1">
+          Уведомления
+          {unreadCount > 0 && (
+            <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">{unreadCount}</span>
+          )}
+        </h1>
+        {unreadCount > 0 && (
+          <button onClick={markAllRead} className="text-xs text-primary font-medium">
+            Прочитать все
+          </button>
+        )}
+      </header>
+
+      {/* Фильтры */}
+      <div className="px-4 py-3 border-b border-border/50 overflow-x-auto">
+        <div className="flex gap-2 w-max">
+          {FILTER_OPTIONS.map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => setFilter(opt.id)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                filter === opt.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              {opt.label}
+              {opt.id === "unread" && unreadCount > 0 && ` (${unreadCount})`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 pb-6">
+        {filtered.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <Icon name="BellOff" size={40} className="mx-auto mb-3 opacity-40" />
+            <p className="text-sm">Уведомлений нет</p>
+          </div>
+        ) : (
+          filtered.map(n => (
+            <div
+              key={n.id}
+              onClick={() => markRead(n.id)}
+              className={`card-calm p-4 cursor-pointer transition-all animate-fade-in ${!n.read ? "border-primary/30" : ""}`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${CATEGORY_COLORS[n.category]}`}>
+                  <Icon name={CATEGORY_ICONS[n.category]} size={15} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {!n.read && <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1" />}
+                      <span className="font-golos font-semibold text-sm leading-snug">{n.title}</span>
+                    </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); deleteNotif(n.id); }}
+                      className="text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 p-0.5"
+                    >
+                      <Icon name="X" size={14} />
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{n.body}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[n.category]}`}>
+                      {CATEGORY_LABELS[n.category]}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{formatRelativeDate(n.date)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Profile Screen ────────────────────────────────────────────────────────
 function ProfileScreen({ profile, setProfile, onClose }: {
   profile: Profile;
@@ -934,6 +1165,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("home");
   const [sosVisible, setSOSVisible] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notifsOpen, setNotifsOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem("darkMode");
     return saved !== null ? JSON.parse(saved) : true;
@@ -944,6 +1176,7 @@ export default function App() {
   const [medications, setMedications] = useLocalStorage<Medication[]>("medications", []);
   const [contacts, setContacts] = useLocalStorage<Contact[]>("contacts", []);
   const [profile, setProfile] = useLocalStorage<Profile>("profile", PROFILE_EMPTY);
+  const [notifications, setNotifications] = useLocalStorage<AppNotification[]>("notifications", DEFAULT_NOTIFICATIONS);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
@@ -962,6 +1195,7 @@ export default function App() {
     <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto">
       {sosVisible && <SOSScreen contacts={contacts} onClose={() => setSOSVisible(false)} />}
       {profileOpen && <ProfileScreen profile={profile} setProfile={setProfile} onClose={() => setProfileOpen(false)} />}
+      {notifsOpen && <NotificationsScreen notifications={notifications} setNotifications={setNotifications} onClose={() => setNotifsOpen(false)} />}
 
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/50 px-4 py-3 flex items-center justify-between">
         {/* Иконка профиля */}
@@ -978,9 +1212,12 @@ export default function App() {
         </button>
 
         <div className="flex items-center gap-2">
-          <button onClick={() => setDarkMode((d: boolean) => !d)}
-            className="p-2 rounded-xl hover:bg-muted transition-colors">
-            <Icon name={darkMode ? "Sun" : "Moon"} size={18} className="text-muted-foreground" />
+          {/* Иконка уведомлений */}
+          <button onClick={() => setNotifsOpen(true)} className="relative p-2 rounded-xl hover:bg-muted transition-colors">
+            <Icon name="Bell" size={18} className="text-muted-foreground" />
+            {notifications.filter(n => !n.read).length > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
+            )}
           </button>
           <button onClick={() => setShowSettings(s => !s)}
             className="p-2 rounded-xl hover:bg-muted transition-colors">
