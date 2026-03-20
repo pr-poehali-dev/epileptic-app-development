@@ -73,6 +73,9 @@ interface AppSettings {
   exportCSV: boolean;
   shareWithFamily: boolean;
   anonymousData: boolean;
+  theme: "default" | "lavender" | "sage" | "rose" | "sand" | "slate" | "custom";
+  customPrimary: string;
+  customBackground: string;
 }
 
 type NotifCategory = "reminder" | "warning" | "recommendation" | "report" | "system";
@@ -1251,6 +1254,7 @@ const SETTINGS_DEFAULT: AppSettings = {
   recommendationsFreq: "daily",
   backupLocal: true, backupCloud: false, exportPDF: true, exportCSV: false,
   shareWithFamily: false, anonymousData: false,
+  theme: "default", customPrimary: "#6b7fc4", customBackground: "#f5f6fa",
 };
 
 function SettingsScreen({ settings, setSettings, contacts, setContacts, onClose }: {
@@ -1361,7 +1365,117 @@ function SettingsScreen({ settings, setSettings, contacts, setContacts, onClose 
           </Row>
         </Section>
 
-        {/* 4. Дневник и отслеживание */}
+        {/* 4. Темы оформления */}
+        <Section icon="Palette" title="Тема оформления">
+          {/* Предустановленные темы */}
+          <div className="py-3">
+            <p className="text-[11px] text-muted-foreground mb-3">Готовые постельные палитры</p>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { id: "default",  label: "Океан",      bg: "#f0f4fa", primary: "#3a6ea8" },
+                { id: "lavender", label: "Лаванда",    bg: "#f3f0fb", primary: "#8b6cc4" },
+                { id: "sage",     label: "Шалфей",     bg: "#f0f5f1", primary: "#3d7a54" },
+                { id: "rose",     label: "Пыльная роза", bg: "#fdf0f3", primary: "#b85a70" },
+                { id: "sand",     label: "Песок",      bg: "#faf5ee", primary: "#9a6e3a" },
+                { id: "slate",    label: "Грифель",    bg: "#f0f3f8", primary: "#3a5c8a" },
+              ] as { id: AppSettings["theme"]; label: string; bg: string; primary: string }[]).map(theme => (
+                <button
+                  key={theme.id}
+                  onClick={() => setS(p => ({ ...p, theme: theme.id }))}
+                  className={`relative rounded-2xl overflow-hidden border-2 transition-all ${s.theme === theme.id ? "border-primary shadow-md scale-[1.03]" : "border-transparent"}`}
+                >
+                  <div className="h-14 w-full flex items-end" style={{ background: theme.bg }}>
+                    <div className="w-full h-5 rounded-t-lg mx-1.5" style={{ background: theme.primary, opacity: 0.85 }} />
+                  </div>
+                  <div className="text-[10px] font-medium py-1.5 text-center bg-card">{theme.label}</div>
+                  {s.theme === theme.id && (
+                    <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                      <Icon name="Check" size={10} className="text-primary-foreground" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Кастомная тема */}
+          <div className="border-t border-border/40 py-3">
+            <button
+              onClick={() => setS(p => ({ ...p, theme: "custom" }))}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all ${s.theme === "custom" ? "border-primary bg-primary/8" : "border-border"}`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-full border border-border overflow-hidden grid grid-cols-2">
+                  <div style={{ background: s.customPrimary }} />
+                  <div style={{ background: s.customBackground }} />
+                </div>
+                <span className="text-sm font-medium">Свои цвета</span>
+              </div>
+              {s.theme === "custom" && <Icon name="Check" size={16} className="text-primary" />}
+            </button>
+
+            {s.theme === "custom" && (
+              <div className="mt-3 space-y-3 animate-fade-in">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-2">Основной цвет (акцент, кнопки)</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={s.customPrimary}
+                      onChange={e => setS(p => ({ ...p, customPrimary: e.target.value }))}
+                      className="w-12 h-10 rounded-xl border border-border cursor-pointer bg-transparent p-0.5"
+                    />
+                    <div className="flex-1 grid grid-cols-5 gap-1.5">
+                      {["#7a8fc4","#8b6cc4","#3d7a54","#b85a70","#9a6e3a"].map(c => (
+                        <button key={c} onClick={() => setS(p => ({ ...p, customPrimary: c }))}
+                          className={`h-8 rounded-lg border-2 transition-all ${s.customPrimary === c ? "border-foreground scale-110" : "border-transparent"}`}
+                          style={{ background: c }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-2">Цвет фона</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={s.customBackground}
+                      onChange={e => setS(p => ({ ...p, customBackground: e.target.value }))}
+                      className="w-12 h-10 rounded-xl border border-border cursor-pointer bg-transparent p-0.5"
+                    />
+                    <div className="flex-1 grid grid-cols-5 gap-1.5">
+                      {["#f0f4fa","#f3f0fb","#f0f5f1","#fdf0f3","#faf5ee"].map(c => (
+                        <button key={c} onClick={() => setS(p => ({ ...p, customBackground: c }))}
+                          className={`h-8 rounded-lg border-2 transition-all ${s.customBackground === c ? "border-foreground scale-110" : "border-transparent"}`}
+                          style={{ background: c }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {/* Предпросмотр */}
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <div className="px-3 py-2 text-[11px] text-muted-foreground bg-muted/40 border-b border-border/40">Предпросмотр</div>
+                  <div className="p-3 flex items-center gap-3" style={{ background: s.customBackground }}>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: s.customPrimary + "28" }}>
+                      <span style={{ color: s.customPrimary, fontSize: 14 }}>●</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="h-2.5 rounded-full w-3/4 mb-1.5" style={{ background: s.customPrimary, opacity: 0.9 }} />
+                      <div className="h-2 rounded-full w-1/2 bg-muted" />
+                    </div>
+                    <div className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-white" style={{ background: s.customPrimary }}>
+                      Кнопка
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </Section>
+
+        {/* 5. Дневник и отслеживание */}
         <Section icon="BookOpen" title="Дневник и отслеживание">
           <Toggle label="Напоминание вести дневник" k="diaryReminder" />
           {s.diaryReminder && (
@@ -1706,6 +1820,47 @@ export default function App() {
     document.documentElement.classList.toggle("dark", darkMode);
     localStorage.setItem("darkMode", JSON.stringify(darkMode));
   }, [darkMode]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.removeAttribute("data-theme");
+    if (appSettings.theme !== "default") {
+      root.setAttribute("data-theme", appSettings.theme);
+    }
+    if (appSettings.theme === "custom") {
+      // Конвертируем hex → HSL для CSS-переменных
+      const hexToHsl = (hex: string) => {
+        const r = parseInt(hex.slice(1, 3), 16) / 255;
+        const g = parseInt(hex.slice(3, 5), 16) / 255;
+        const b = parseInt(hex.slice(5, 7), 16) / 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h = 0, s = 0;
+        const l = (max + min) / 2;
+        if (max !== min) {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+          else if (max === g) h = ((b - r) / d + 2) / 6;
+          else h = ((r - g) / d + 4) / 6;
+        }
+        return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+      };
+      root.style.setProperty("--primary", hexToHsl(appSettings.customPrimary));
+      root.style.setProperty("--ring", hexToHsl(appSettings.customPrimary));
+      const bg = appSettings.customBackground;
+      root.style.setProperty("--background", hexToHsl(bg));
+      const bgHsl = hexToHsl(bg);
+      const parts = bgHsl.split(" ");
+      const h = parts[0], s = parts[1];
+      const cardL = Math.min(100, parseInt(parts[2]) + 3);
+      root.style.setProperty("--card", `${h} ${s} ${cardL}%`);
+    } else {
+      root.style.removeProperty("--primary");
+      root.style.removeProperty("--ring");
+      root.style.removeProperty("--background");
+      root.style.removeProperty("--card");
+    }
+  }, [appSettings.theme, appSettings.customPrimary, appSettings.customBackground]);
 
   const tabs = [
     { id: "home" as Tab, icon: "Home", label: "Главная" },

@@ -2,6 +2,208 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Preset Themes ──────────────────────────────────────────────────────── */
+
+/* Лавандовый */
+[data-theme="lavender"] {
+  --background: 260 30% 97%;
+  --foreground: 260 25% 18%;
+  --card: 260 20% 100%;
+  --card-foreground: 260 25% 18%;
+  --popover: 260 20% 100%;
+  --popover-foreground: 260 25% 18%;
+  --primary: 262 45% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 260 20% 92%;
+  --secondary-foreground: 260 25% 22%;
+  --muted: 260 15% 93%;
+  --muted-foreground: 260 15% 52%;
+  --accent: 260 25% 88%;
+  --accent-foreground: 260 25% 22%;
+  --border: 260 18% 88%;
+  --input: 260 18% 88%;
+  --ring: 262 45% 58%;
+}
+[data-theme="lavender"].dark {
+  --background: 262 20% 10%;
+  --foreground: 260 30% 92%;
+  --card: 262 20% 13%;
+  --card-foreground: 260 30% 92%;
+  --popover: 262 20% 13%;
+  --popover-foreground: 260 30% 92%;
+  --primary: 262 50% 68%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 262 18% 18%;
+  --secondary-foreground: 260 30% 85%;
+  --muted: 262 18% 17%;
+  --muted-foreground: 260 15% 55%;
+  --accent: 262 18% 22%;
+  --accent-foreground: 260 30% 90%;
+  --border: 262 15% 22%;
+  --input: 262 15% 22%;
+  --ring: 262 50% 68%;
+}
+
+/* Шалфей */
+[data-theme="sage"] {
+  --background: 145 20% 96%;
+  --foreground: 145 25% 15%;
+  --card: 145 15% 100%;
+  --card-foreground: 145 25% 15%;
+  --popover: 145 15% 100%;
+  --popover-foreground: 145 25% 15%;
+  --primary: 152 35% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 145 18% 91%;
+  --secondary-foreground: 145 25% 20%;
+  --muted: 145 14% 92%;
+  --muted-foreground: 145 12% 50%;
+  --accent: 145 22% 87%;
+  --accent-foreground: 145 25% 20%;
+  --border: 145 16% 87%;
+  --input: 145 16% 87%;
+  --ring: 152 35% 42%;
+}
+[data-theme="sage"].dark {
+  --background: 152 18% 10%;
+  --foreground: 145 28% 91%;
+  --card: 152 18% 13%;
+  --card-foreground: 145 28% 91%;
+  --popover: 152 18% 13%;
+  --popover-foreground: 145 28% 91%;
+  --primary: 152 38% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 152 16% 18%;
+  --secondary-foreground: 145 28% 83%;
+  --muted: 152 16% 16%;
+  --muted-foreground: 145 12% 54%;
+  --accent: 152 16% 21%;
+  --accent-foreground: 145 28% 88%;
+  --border: 152 14% 21%;
+  --input: 152 14% 21%;
+  --ring: 152 38% 52%;
+}
+
+/* Пыльная роза */
+[data-theme="rose"] {
+  --background: 350 25% 97%;
+  --foreground: 350 22% 16%;
+  --card: 350 18% 100%;
+  --card-foreground: 350 22% 16%;
+  --popover: 350 18% 100%;
+  --popover-foreground: 350 22% 16%;
+  --primary: 350 42% 55%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 350 18% 92%;
+  --secondary-foreground: 350 22% 22%;
+  --muted: 350 14% 93%;
+  --muted-foreground: 350 12% 52%;
+  --accent: 350 22% 88%;
+  --accent-foreground: 350 22% 22%;
+  --border: 350 18% 88%;
+  --input: 350 18% 88%;
+  --ring: 350 42% 55%;
+}
+[data-theme="rose"].dark {
+  --background: 350 18% 10%;
+  --foreground: 350 28% 91%;
+  --card: 350 18% 13%;
+  --card-foreground: 350 28% 91%;
+  --popover: 350 18% 13%;
+  --popover-foreground: 350 28% 91%;
+  --primary: 350 42% 62%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 350 15% 18%;
+  --secondary-foreground: 350 28% 84%;
+  --muted: 350 15% 17%;
+  --muted-foreground: 350 12% 54%;
+  --accent: 350 15% 21%;
+  --accent-foreground: 350 28% 88%;
+  --border: 350 13% 21%;
+  --input: 350 13% 21%;
+  --ring: 350 42% 62%;
+}
+
+/* Тёплый песок */
+[data-theme="sand"] {
+  --background: 38 28% 96%;
+  --foreground: 38 30% 14%;
+  --card: 38 20% 100%;
+  --card-foreground: 38 30% 14%;
+  --popover: 38 20% 100%;
+  --popover-foreground: 38 30% 14%;
+  --primary: 32 45% 48%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 38 22% 91%;
+  --secondary-foreground: 38 30% 20%;
+  --muted: 38 16% 92%;
+  --muted-foreground: 38 14% 50%;
+  --accent: 38 26% 87%;
+  --accent-foreground: 38 30% 20%;
+  --border: 38 20% 87%;
+  --input: 38 20% 87%;
+  --ring: 32 45% 48%;
+}
+[data-theme="sand"].dark {
+  --background: 32 18% 10%;
+  --foreground: 38 28% 90%;
+  --card: 32 18% 13%;
+  --card-foreground: 38 28% 90%;
+  --popover: 32 18% 13%;
+  --popover-foreground: 38 28% 90%;
+  --primary: 32 48% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 32 15% 18%;
+  --secondary-foreground: 38 28% 83%;
+  --muted: 32 15% 16%;
+  --muted-foreground: 38 12% 53%;
+  --accent: 32 15% 21%;
+  --accent-foreground: 38 28% 88%;
+  --border: 32 13% 20%;
+  --input: 32 13% 20%;
+  --ring: 32 48% 58%;
+}
+
+/* Грифельный */
+[data-theme="slate"] {
+  --background: 215 22% 96%;
+  --foreground: 215 28% 14%;
+  --card: 215 16% 100%;
+  --card-foreground: 215 28% 14%;
+  --popover: 215 16% 100%;
+  --popover-foreground: 215 28% 14%;
+  --primary: 215 48% 45%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 18% 91%;
+  --secondary-foreground: 215 28% 20%;
+  --muted: 215 14% 92%;
+  --muted-foreground: 215 12% 50%;
+  --accent: 215 22% 87%;
+  --accent-foreground: 215 28% 20%;
+  --border: 215 18% 87%;
+  --input: 215 18% 87%;
+  --ring: 215 48% 45%;
+}
+[data-theme="slate"].dark {
+  --background: 215 20% 10%;
+  --foreground: 215 28% 91%;
+  --card: 215 20% 13%;
+  --card-foreground: 215 28% 91%;
+  --popover: 215 20% 13%;
+  --popover-foreground: 215 28% 91%;
+  --primary: 215 50% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 16% 18%;
+  --secondary-foreground: 215 28% 83%;
+  --muted: 215 16% 16%;
+  --muted-foreground: 215 12% 54%;
+  --accent: 215 16% 21%;
+  --accent-foreground: 215 28% 88%;
+  --border: 215 14% 21%;
+  --input: 215 14% 21%;
+  --ring: 215 50% 58%;
+}
+
 @layer base {
   :root {
     --background: 220 20% 97%;
