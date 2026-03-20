@@ -42,6 +42,39 @@ interface Profile {
   weight: string;
 }
 
+interface AppSettings {
+  pushEnabled: boolean;
+  smsEnabled: boolean;
+  notifMeds: boolean;
+  notifSeizureWarning: boolean;
+  notifDiary: boolean;
+  notifInfo: boolean;
+  notifSound: boolean;
+  notifVibration: boolean;
+  notifTime: string;
+  emergencyMessage: string;
+  emergencyGeo: boolean;
+  highContrast: boolean;
+  fontSize: "small" | "medium" | "large" | "xlarge";
+  noFlash: boolean;
+  diaryReminder: boolean;
+  diaryReminderTime: string;
+  trackTriggers: boolean;
+  trackMood: boolean;
+  trackHealth: boolean;
+  autoMatchTriggers: boolean;
+  medSnooze: string;
+  predictionEnabled: boolean;
+  predictionSensitivity: "low" | "medium" | "high";
+  recommendationsFreq: "daily" | "events" | "manual";
+  backupLocal: boolean;
+  backupCloud: boolean;
+  exportPDF: boolean;
+  exportCSV: boolean;
+  shareWithFamily: boolean;
+  anonymousData: boolean;
+}
+
 type NotifCategory = "reminder" | "warning" | "recommendation" | "report" | "system";
 
 interface AppNotification {
@@ -945,6 +978,251 @@ function NotificationsScreen({
   );
 }
 
+// ─── Settings Screen ───────────────────────────────────────────────────────
+const SETTINGS_DEFAULT: AppSettings = {
+  pushEnabled: true, smsEnabled: false,
+  notifMeds: true, notifSeizureWarning: true, notifDiary: true, notifInfo: false,
+  notifSound: true, notifVibration: true, notifTime: "09:00",
+  emergencyMessage: "У меня эпилептический приступ. Пожалуйста, помогите и вызовите скорую.", emergencyGeo: true,
+  highContrast: false, fontSize: "medium", noFlash: false,
+  diaryReminder: true, diaryReminderTime: "21:00",
+  trackTriggers: true, trackMood: true, trackHealth: true, autoMatchTriggers: true,
+  medSnooze: "15",
+  predictionEnabled: true, predictionSensitivity: "medium",
+  recommendationsFreq: "daily",
+  backupLocal: true, backupCloud: false, exportPDF: true, exportCSV: false,
+  shareWithFamily: false, anonymousData: false,
+};
+
+function SettingsScreen({ settings, setSettings, contacts, setContacts, onClose }: {
+  settings: AppSettings;
+  setSettings: (v: AppSettings | ((p: AppSettings) => AppSettings)) => void;
+  contacts: Contact[];
+  setContacts: (v: Contact[] | ((p: Contact[]) => Contact[])) => void;
+  onClose: () => void;
+}) {
+  const [s, setS] = useState<AppSettings>(settings);
+  const save = () => { setSettings(s); onClose(); };
+  const tog = (k: keyof AppSettings) => setS(p => ({ ...p, [k]: !p[k] }));
+  const set = <K extends keyof AppSettings>(k: K, v: AppSettings[K]) => setS(p => ({ ...p, [k]: v }));
+
+  const Toggle = ({ label, k, accent }: { label: string; k: keyof AppSettings; accent?: string }) => (
+    <div className="flex items-center justify-between py-2.5">
+      <span className="text-sm">{label}</span>
+      <button
+        onClick={() => tog(k)}
+        className={`w-11 h-6 rounded-full transition-colors relative ${s[k] ? (accent || "bg-primary") : "bg-muted"}`}
+      >
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${s[k] ? "left-[22px]" : "left-0.5"}`} />
+      </button>
+    </div>
+  );
+
+  const Section = ({ icon, title, color, children }: { icon: string; title: string; color?: string; children: React.ReactNode }) => (
+    <div className="card-calm overflow-hidden">
+      <div className={`px-4 py-3 flex items-center gap-2 border-b border-border/50 ${color || ""}`}>
+        <Icon name={icon} size={17} className={color ? "" : "text-primary"} />
+        <span className="font-golos font-semibold text-sm">{title}</span>
+      </div>
+      <div className="px-4 divide-y divide-border/40">{children}</div>
+    </div>
+  );
+
+  const Row = ({ children }: { children: React.ReactNode }) => <div className="py-2.5">{children}</div>;
+
+  return (
+    <div className="fixed inset-0 z-40 bg-background flex flex-col max-w-md mx-auto animate-fade-in">
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/50 px-4 py-3 flex items-center gap-3">
+        <button onClick={onClose} className="p-2 rounded-xl hover:bg-muted transition-colors">
+          <Icon name="ChevronLeft" size={20} className="text-muted-foreground" />
+        </button>
+        <h1 className="font-golos font-bold text-lg flex-1">Настройки</h1>
+        <button onClick={save} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium">
+          Сохранить
+        </button>
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 pb-10">
+
+        {/* 1. Уведомления */}
+        <Section icon="Bell" title="Уведомления" color="text-orange-500">
+          <Toggle label="Push-уведомления" k="pushEnabled" accent="bg-orange-500" />
+          <Toggle label="SMS-оповещения" k="smsEnabled" accent="bg-orange-500" />
+          <div className="border-t border-border/30 pt-1 pb-0.5">
+            <p className="text-[11px] text-muted-foreground pt-2 pb-1">Типы уведомлений</p>
+            <Toggle label="Напоминания о лекарствах" k="notifMeds" />
+            <Toggle label="Предупреждения о приступе" k="notifSeizureWarning" />
+            <Toggle label="Напоминания вести дневник" k="notifDiary" />
+            <Toggle label="Советы и рекомендации" k="notifInfo" />
+          </div>
+          <div className="border-t border-border/30 pt-1">
+            <Toggle label="Звук" k="notifSound" />
+            <Toggle label="Вибрация" k="notifVibration" />
+            <Row>
+              <label className="text-xs text-muted-foreground block mb-1">Время уведомлений</label>
+              <input type="time" value={s.notifTime} onChange={e => set("notifTime", e.target.value)}
+                className="w-full bg-muted/50 border border-border rounded-xl px-3 py-2 text-sm" />
+            </Row>
+          </div>
+        </Section>
+
+        {/* 2. Экстренный контакт */}
+        <Section icon="ShieldAlert" title="Экстренный контакт" color="text-red-500">
+          <div className="py-2">
+            <ContactsManager contacts={contacts} setContacts={setContacts} />
+          </div>
+          <Row>
+            <label className="text-xs text-muted-foreground block mb-1">Автосообщение при тревоге</label>
+            <textarea value={s.emergencyMessage} onChange={e => set("emergencyMessage", e.target.value)}
+              className="w-full bg-muted/50 border border-border rounded-xl px-3 py-2 text-sm h-16 resize-none" />
+          </Row>
+          <Toggle label="Прикреплять геолокацию" k="emergencyGeo" accent="bg-red-500" />
+          <div className="py-2.5">
+            <button className="w-full py-2.5 rounded-xl border border-red-400/40 text-red-500 text-sm font-medium flex items-center justify-center gap-2">
+              <Icon name="Send" size={15} /> Тест экстренного сообщения
+            </button>
+          </div>
+        </Section>
+
+        {/* 3. Доступность */}
+        <Section icon="Eye" title="Доступность">
+          <Toggle label="Высокая контрастность" k="highContrast" />
+          <Toggle label="Режим без мигания (фотосенситивность)" k="noFlash" />
+          <Row>
+            <label className="text-xs text-muted-foreground block mb-2">Размер шрифта</label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {(["small","medium","large","xlarge"] as const).map((sz, i) => (
+                <button key={sz} onClick={() => set("fontSize", sz)}
+                  className={`py-2 rounded-xl text-xs font-medium border transition-colors ${s.fontSize === sz ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground"}`}>
+                  {["А","А","А","А"][i]}<span style={{ fontSize: `${10 + i * 2}px` }}> </span>
+                  {["Мал","Сред","Бол","Оч. бол"][i]}
+                </button>
+              ))}
+            </div>
+          </Row>
+        </Section>
+
+        {/* 4. Дневник и отслеживание */}
+        <Section icon="BookOpen" title="Дневник и отслеживание">
+          <Toggle label="Напоминание вести дневник" k="diaryReminder" />
+          {s.diaryReminder && (
+            <Row>
+              <label className="text-xs text-muted-foreground block mb-1">Время напоминания</label>
+              <input type="time" value={s.diaryReminderTime} onChange={e => set("diaryReminderTime", e.target.value)}
+                className="w-full bg-muted/50 border border-border rounded-xl px-3 py-2 text-sm" />
+            </Row>
+          )}
+          <div className="border-t border-border/30 pt-1">
+            <p className="text-[11px] text-muted-foreground pt-2 pb-1">Параметры отслеживания</p>
+            <Toggle label="Триггеры приступов" k="trackTriggers" />
+            <Toggle label="Настроение" k="trackMood" />
+            <Toggle label="Самочувствие и энергия" k="trackHealth" />
+            <Toggle label="Автосопоставление с триггерами" k="autoMatchTriggers" />
+          </div>
+        </Section>
+
+        {/* 5. Лекарства и лечение */}
+        <Section icon="Pill" title="Лекарства и лечение">
+          <Row>
+            <label className="text-xs text-muted-foreground block mb-1">Отсрочка напоминания (мин)</label>
+            <div className="flex gap-2">
+              {["5","10","15","30"].map(v => (
+                <button key={v} onClick={() => set("medSnooze", v)}
+                  className={`flex-1 py-2 rounded-xl text-sm border transition-colors ${s.medSnooze === v ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground"}`}>
+                  +{v}
+                </button>
+              ))}
+            </div>
+          </Row>
+          <div className="py-2.5">
+            <button className="w-full py-2.5 rounded-xl border border-primary/40 text-primary text-sm font-medium flex items-center justify-center gap-2">
+              <Icon name="FileText" size={15} /> Экспорт данных для врача
+            </button>
+          </div>
+        </Section>
+
+        {/* 6. Прогнозы и рекомендации */}
+        <Section icon="TrendingUp" title="Прогнозы и рекомендации">
+          <Toggle label="Система прогнозирования приступов" k="predictionEnabled" />
+          {s.predictionEnabled && (
+            <Row>
+              <label className="text-xs text-muted-foreground block mb-2">Чувствительность прогноза</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(["low","medium","high"] as const).map(v => (
+                  <button key={v} onClick={() => set("predictionSensitivity", v)}
+                    className={`py-2 rounded-xl text-xs font-medium border transition-colors ${s.predictionSensitivity === v ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground"}`}>
+                    {v === "low" ? "Низкая" : v === "medium" ? "Средняя" : "Высокая"}
+                  </button>
+                ))}
+              </div>
+            </Row>
+          )}
+          <Row>
+            <label className="text-xs text-muted-foreground block mb-2">Частота рекомендаций</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(["daily","events","manual"] as const).map(v => (
+                <button key={v} onClick={() => set("recommendationsFreq", v)}
+                  className={`py-2 rounded-xl text-xs font-medium border transition-colors ${s.recommendationsFreq === v ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground"}`}>
+                  {v === "daily" ? "Ежедневно" : v === "events" ? "По событиям" : "Вручную"}
+                </button>
+              ))}
+            </div>
+          </Row>
+        </Section>
+
+        {/* 7. Данные и конфиденциальность */}
+        <Section icon="Lock" title="Данные и конфиденциальность">
+          <div>
+            <p className="text-[11px] text-muted-foreground pt-2.5 pb-1">Резервное копирование</p>
+            <Toggle label="Локальное сохранение" k="backupLocal" />
+            <Toggle label="Облачное сохранение" k="backupCloud" />
+          </div>
+          <div className="border-t border-border/30">
+            <p className="text-[11px] text-muted-foreground pt-2.5 pb-1">Экспорт данных</p>
+            <div className="flex gap-2 pb-2.5">
+              <button className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                <Icon name="FileText" size={14} /> PDF
+              </button>
+              <button className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                <Icon name="Table" size={14} /> CSV
+              </button>
+            </div>
+          </div>
+          <Toggle label="Доступ близких к данным" k="shareWithFamily" />
+          <Toggle label="Анонимный сбор для исследований" k="anonymousData" />
+        </Section>
+
+        {/* 9. О приложении */}
+        <Section icon="Info" title="О приложении">
+          <div className="py-3 flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Версия</span>
+            <span className="text-sm font-medium">1.0.0</span>
+          </div>
+          {[
+            { label: "Пользовательское соглашение", icon: "FileText" },
+            { label: "Политика конфиденциальности", icon: "Shield" },
+            { label: "FAQ — частые вопросы", icon: "HelpCircle" },
+            { label: "Обратная связь", icon: "MessageSquare" },
+          ].map(item => (
+            <button key={item.label} className="w-full flex items-center justify-between py-3 border-t border-border/40 first:border-0">
+              <div className="flex items-center gap-2 text-sm">
+                <Icon name={item.icon} size={16} className="text-muted-foreground" />
+                {item.label}
+              </div>
+              <Icon name="ChevronRight" size={16} className="text-muted-foreground" />
+            </button>
+          ))}
+          <div className="py-3 border-t border-border/40 text-xs text-muted-foreground">
+            <div>Поддержка: support@epicontrol.ru</div>
+            <div className="mt-0.5">Телефон: 8-800-000-00-00</div>
+          </div>
+        </Section>
+
+      </div>
+    </div>
+  );
+}
+
 // ─── Profile Screen ────────────────────────────────────────────────────────
 function ProfileScreen({ profile, setProfile, onClose }: {
   profile: Profile;
@@ -1152,17 +1430,18 @@ export default function App() {
   const [sosVisible, setSOSVisible] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifsOpen, setNotifsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem("darkMode");
     return saved !== null ? JSON.parse(saved) : true;
   });
-  const [showSettings, setShowSettings] = useState(false);
 
   const [seizures, setSeizures] = useLocalStorage<Seizure[]>("seizures", []);
   const [medications, setMedications] = useLocalStorage<Medication[]>("medications", []);
   const [contacts, setContacts] = useLocalStorage<Contact[]>("contacts", []);
   const [profile, setProfile] = useLocalStorage<Profile>("profile", PROFILE_EMPTY);
   const [notifications, setNotifications] = useLocalStorage<AppNotification[]>("notifications", DEFAULT_NOTIFICATIONS);
+  const [appSettings, setAppSettings] = useLocalStorage<AppSettings>("appSettings", SETTINGS_DEFAULT);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
@@ -1182,9 +1461,9 @@ export default function App() {
       {sosVisible && <SOSScreen contacts={contacts} onClose={() => setSOSVisible(false)} />}
       {profileOpen && <ProfileScreen profile={profile} setProfile={setProfile} onClose={() => setProfileOpen(false)} />}
       {notifsOpen && <NotificationsScreen notifications={notifications} setNotifications={setNotifications} onClose={() => setNotifsOpen(false)} />}
+      {settingsOpen && <SettingsScreen settings={appSettings} setSettings={setAppSettings} contacts={contacts} setContacts={setContacts} onClose={() => setSettingsOpen(false)} />}
 
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/50 px-4 py-3 flex items-center justify-between">
-        {/* Иконка профиля */}
         <button onClick={() => setProfileOpen(true)} className="flex items-center gap-2 p-1 rounded-xl hover:bg-muted transition-colors">
           <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
             {profile.fullName
@@ -1198,25 +1477,17 @@ export default function App() {
         </button>
 
         <div className="flex items-center gap-2">
-          {/* Иконка уведомлений */}
           <button onClick={() => setNotifsOpen(true)} className="relative p-2 rounded-xl hover:bg-muted transition-colors">
             <Icon name="Bell" size={18} className="text-muted-foreground" />
             {notifications.filter(n => !n.read).length > 0 && (
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
             )}
           </button>
-          <button onClick={() => setShowSettings(s => !s)}
-            className="p-2 rounded-xl hover:bg-muted transition-colors">
+          <button onClick={() => setSettingsOpen(true)} className="p-2 rounded-xl hover:bg-muted transition-colors">
             <Icon name="Settings" size={18} className="text-muted-foreground" />
           </button>
         </div>
       </header>
-
-      {showSettings && (
-        <div className="animate-slide-up border-b border-border bg-card px-4 py-4">
-          <ContactsManager contacts={contacts} setContacts={setContacts} />
-        </div>
-      )}
 
       <main className="flex-1 px-4 py-4 pb-24 overflow-y-auto">
         {tab === "home" && (
