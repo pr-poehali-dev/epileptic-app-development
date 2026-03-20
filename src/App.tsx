@@ -180,7 +180,7 @@ function HomeTab({
       <div className="card-calm p-4">
         <h3 className="font-golos font-semibold mb-3 flex items-center gap-2">
           <Icon name="ShieldCheck" size={18} className="text-primary" />
-          Безприступный период
+          Период без приступов
         </h3>
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-muted/50 rounded-2xl p-3 text-center">
@@ -263,20 +263,6 @@ function HomeTab({
           </div>
         )}
       </div>
-
-      {/* Последний приступ */}
-      {lastSeizure && (
-        <div className="card-calm p-4">
-          <h3 className="font-golos font-semibold mb-2 flex items-center gap-2">
-            <Icon name="Clock" size={18} className="text-primary" />
-            Последний приступ
-          </h3>
-          <div className="text-sm text-muted-foreground">
-            <span className="text-foreground font-medium">{lastSeizure.date}</span> в {lastSeizure.time}
-            <div className="mt-1">{lastSeizure.type}</div>
-          </div>
-        </div>
-      )}
 
       {/* Экстренные контакты */}
       {contacts.length > 0 && (
