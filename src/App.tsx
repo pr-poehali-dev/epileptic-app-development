@@ -593,8 +593,115 @@ function MedsTab({ medications, setMedications }: { medications: Medication[]; s
   );
 }
 
+// ─── Forecast Engine ───────────────────────────────────────────────────────
+interface ForecastResult {
+  windowStart: string;
+  windowEnd: string;
+  probability: number;
+  confidence: "low" | "medium" | "high";
+  predictedType: string;
+  likelyTriggers: string[];
+  reasoning: string[];
+}
+
+function computeForecast(seizures: Seizure[]): ForecastResult | null {
+  if (seizures.length < 2) return null;
+
+  const sorted = [...seizures].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+
+  // Средний интервал между приступами (дней)
+  const intervals: number[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const diff = (new Date(sorted[i].date).getTime() - new Date(sorted[i - 1].date).getTime()) / 86400000;
+    if (diff > 0) intervals.push(diff);
+  }
+  const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  const stdDev = Math.sqrt(intervals.reduce((a, b) => a + Math.pow(b - avgInterval, 2), 0) / intervals.length);
+
+  // Дни с последнего приступа
+  const last = sorted[sorted.length - 1];
+  const daysSinceLast = (Date.now() - new Date(last.date).getTime()) / 86400000;
+
+  // Ожидаемый следующий приступ
+  const daysUntil = Math.max(0, avgInterval - daysSinceLast);
+  const windowStart = new Date(Date.now() + daysUntil * 86400000);
+  const windowEnd = new Date(Date.now() + (daysUntil + stdDev) * 86400000);
+
+  // Вероятность: чем ближе к среднему интервалу, тем выше
+  const ratio = daysSinceLast / avgInterval;
+  let probability: number;
+  if (ratio < 0.5) probability = 15;
+  else if (ratio < 0.8) probability = 35;
+  else if (ratio < 1.0) probability = 60;
+  else if (ratio < 1.3) probability = 75;
+  else probability = 85;
+
+  // Корректируем вероятность по тренду (растёт/падает)
+  const recentMonths = sorted.filter(s => {
+    const d = (Date.now() - new Date(s.date).getTime()) / 86400000;
+    return d <= 60;
+  }).length;
+  const olderMonths = sorted.filter(s => {
+    const d = (Date.now() - new Date(s.date).getTime()) / 86400000;
+    return d > 60 && d <= 120;
+  }).length;
+  if (recentMonths > olderMonths) probability = Math.min(95, probability + 10);
+  else if (recentMonths < olderMonths) probability = Math.max(5, probability - 10);
+
+  // Уверенность прогноза
+  const confidence: "low" | "medium" | "high" =
+    sorted.length >= 10 ? "high" : sorted.length >= 5 ? "medium" : "low";
+
+  // Топ триггеры из последних записей
+  const recentSeizures = sorted.slice(-5);
+  const triggerCount: Record<string, number> = {};
+  recentSeizures.forEach(s => s.triggers.forEach(t => { triggerCount[t] = (triggerCount[t] || 0) + 1; }));
+  const likelyTriggers = Object.entries(triggerCount).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t);
+
+  // Наиболее частый тип
+  const typeCounts: Record<string, number> = {};
+  sorted.forEach(s => { typeCounts[s.type] = (typeCounts[s.type] || 0) + 1; });
+  const predictedType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0][0];
+
+  // Временные паттерны — час суток
+  const hourCounts: Record<number, number> = {};
+  sorted.forEach(s => {
+    if (s.time) {
+      const h = parseInt(s.time.slice(0, 2));
+      hourCounts[h] = (hourCounts[h] || 0) + 1;
+    }
+  });
+  const peakHour = Object.entries(hourCounts).sort((a, b) => Number(b[1]) - Number(a[1]))[0];
+  const peakPeriod = peakHour
+    ? parseInt(peakHour[0]) < 6 ? "ночью" : parseInt(peakHour[0]) < 12 ? "утром" : parseInt(peakHour[0]) < 18 ? "днём" : "вечером"
+    : null;
+
+  const reasoning: string[] = [];
+  reasoning.push(`Средний интервал между приступами — ${Math.round(avgInterval)} дней (±${Math.round(stdDev)} дн.)`);
+  reasoning.push(`С последнего приступа прошло ${Math.round(daysSinceLast)} дней`);
+  if (likelyTriggers.length > 0) reasoning.push(`Частые триггеры в последних записях: ${likelyTriggers.join(", ")}`);
+  if (peakPeriod) reasoning.push(`Большинство приступов происходит ${peakPeriod}`);
+  if (recentMonths > olderMonths) reasoning.push("Частота приступов за последние 2 месяца выросла");
+  else if (recentMonths < olderMonths) reasoning.push("Частота приступов за последние 2 месяца снизилась");
+  reasoning.push(`Прогноз основан на ${sorted.length} записях в дневнике`);
+
+  const fmt = (d: Date) => d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+
+  return {
+    windowStart: fmt(windowStart),
+    windowEnd: fmt(windowEnd),
+    probability,
+    confidence,
+    predictedType,
+    likelyTriggers,
+    reasoning,
+  };
+}
+
 // ─── Analytics Tab ─────────────────────────────────────────────────────────
 function AnalyticsTab({ seizures }: { seizures: Seizure[] }) {
+  const [view, setView] = useState<"stats" | "forecast">("stats");
+
   const months = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
     d.setMonth(d.getMonth() - (5 - i));
@@ -614,85 +721,237 @@ function AnalyticsTab({ seizures }: { seizures: Seizure[] }) {
     ? (seizures.reduce((s, x) => s + x.intensity, 0) / seizures.length).toFixed(1)
     : "—";
 
+  const forecast = computeForecast(seizures);
+
+  const confidenceLabel = { low: "Низкая", medium: "Средняя", high: "Высокая" };
+  const confidenceColor = {
+    low: "text-amber-500 bg-amber-500/10",
+    medium: "text-blue-500 bg-blue-500/10",
+    high: "text-green-500 bg-green-500/10",
+  };
+  const probColor = (p: number) =>
+    p >= 70 ? "text-red-500" : p >= 40 ? "text-amber-500" : "text-green-500";
+  const probBg = (p: number) =>
+    p >= 70 ? "bg-red-500" : p >= 40 ? "bg-amber-500" : "bg-green-500";
+
   return (
     <div className="space-y-4 animate-fade-in">
       <h2 className="text-xl font-golos font-bold">Аналитика</h2>
 
-      {seizures.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <div className="text-4xl mb-3">📊</div>
-          <p>Добавьте приступы в дневник, чтобы увидеть статистику</p>
-        </div>
-      ) : (
+      {/* Переключатель вкладок */}
+      <div className="flex gap-2 bg-muted/50 p-1 rounded-2xl">
+        <button onClick={() => setView("stats")}
+          className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${view === "stats" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}>
+          Статистика
+        </button>
+        <button onClick={() => setView("forecast")}
+          className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${view === "forecast" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}>
+          <Icon name="TrendingUp" size={14} />
+          Прогноз
+        </button>
+      </div>
+
+      {/* ── СТАТИСТИКА ── */}
+      {view === "stats" && (
         <>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="card-calm p-3 text-center">
-              <div className="text-2xl font-golos font-bold text-primary">{seizures.length}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">всего</div>
+          {seizures.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="text-4xl mb-3">📊</div>
+              <p>Добавьте приступы в дневник, чтобы увидеть статистику</p>
             </div>
-            <div className="card-calm p-3 text-center">
-              <div className="text-2xl font-golos font-bold text-primary">{avgIntensity}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">интенс.</div>
-            </div>
-            <div className="card-calm p-3 text-center">
-              <div className="text-2xl font-golos font-bold text-primary">
-                {seizures.filter(s => s.date.startsWith(new Date().toISOString().slice(0, 7))).length}
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="card-calm p-3 text-center">
+                  <div className="text-2xl font-golos font-bold text-primary">{seizures.length}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">всего</div>
+                </div>
+                <div className="card-calm p-3 text-center">
+                  <div className="text-2xl font-golos font-bold text-primary">{avgIntensity}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">интенс.</div>
+                </div>
+                <div className="card-calm p-3 text-center">
+                  <div className="text-2xl font-golos font-bold text-primary">
+                    {seizures.filter(s => s.date.startsWith(new Date().toISOString().slice(0, 7))).length}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">за месяц</div>
+                </div>
               </div>
-              <div className="text-xs text-muted-foreground mt-0.5">за месяц</div>
-            </div>
-          </div>
 
-          <div className="card-calm p-4">
-            <h3 className="font-golos font-semibold mb-4">Приступы по месяцам</h3>
-            <div className="flex items-end justify-between gap-2 h-24">
-              {months.map(m => {
-                const count = seizures.filter(s => s.date.startsWith(m)).length;
-                const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
-                const label = m.slice(5);
-                return (
-                  <div key={m} className="flex-1 flex flex-col items-center gap-1">
-                    <div className="text-xs text-muted-foreground">{count || ""}</div>
-                    <div className="w-full flex items-end" style={{ height: "64px" }}>
-                      <div
-                        className="w-full rounded-t-lg bg-primary/70 transition-all"
-                        style={{ height: count === 0 ? "4px" : `${height}%`, opacity: count === 0 ? 0.2 : 1 }}
+              <div className="card-calm p-4">
+                <h3 className="font-golos font-semibold mb-4">Приступы по месяцам</h3>
+                <div className="flex items-end justify-between gap-2 h-24">
+                  {months.map(m => {
+                    const count = seizures.filter(s => s.date.startsWith(m)).length;
+                    const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                    const label = m.slice(5);
+                    return (
+                      <div key={m} className="flex-1 flex flex-col items-center gap-1">
+                        <div className="text-xs text-muted-foreground">{count || ""}</div>
+                        <div className="w-full flex items-end" style={{ height: "64px" }}>
+                          <div
+                            className="w-full rounded-t-lg bg-primary/70 transition-all"
+                            style={{ height: count === 0 ? "4px" : `${height}%`, opacity: count === 0 ? 0.2 : 1 }}
+                          />
+                        </div>
+                        <div className="text-xs text-muted-foreground">{label}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {topTriggers.length > 0 && (
+                <div className="card-calm p-4">
+                  <h3 className="font-golos font-semibold mb-3">Частые триггеры</h3>
+                  <div className="space-y-2">
+                    {topTriggers.map(([name, count]) => (
+                      <div key={name} className="flex items-center gap-3">
+                        <div className="text-sm flex-1">{name}</div>
+                        <div className="flex-1 bg-muted rounded-full h-2">
+                          <div className="bg-primary h-2 rounded-full" style={{ width: `${(count / topTriggers[0][1]) * 100}%` }} />
+                        </div>
+                        <div className="text-xs text-muted-foreground w-5 text-right">{count}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="card-calm p-4">
+                <h3 className="font-golos font-semibold mb-3">Типы приступов</h3>
+                <div className="space-y-2">
+                  {Object.entries(typesCounts).map(([type, count]) => (
+                    <div key={type} className="flex justify-between items-center">
+                      <span className="text-sm">{type}</span>
+                      <span className="text-sm font-medium text-primary">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {/* ── ПРОГНОЗ ── */}
+      {view === "forecast" && (
+        <>
+          {!forecast ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="text-4xl mb-3">🔮</div>
+              <p className="text-sm">Для прогноза нужно минимум 2 записи в дневнике</p>
+            </div>
+          ) : (
+            <div className="space-y-3 animate-fade-in">
+
+              {/* Вероятность — главная карточка */}
+              <div className="card-calm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-golos font-semibold flex items-center gap-2">
+                    <Icon name="TrendingUp" size={18} className="text-primary" />
+                    Вероятность приступа
+                  </h3>
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${confidenceColor[forecast.confidence]}`}>
+                    Уверенность: {confidenceLabel[forecast.confidence]}
+                  </span>
+                </div>
+
+                {/* Циферблат вероятности */}
+                <div className="flex flex-col items-center my-2">
+                  <div className="relative w-32 h-32">
+                    <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="hsl(var(--muted))" strokeWidth="10" />
+                      <circle
+                        cx="60" cy="60" r="50" fill="none"
+                        stroke={forecast.probability >= 70 ? "hsl(0 72% 51%)" : forecast.probability >= 40 ? "hsl(38 92% 50%)" : "hsl(152 55% 38%)"}
+                        strokeWidth="10"
+                        strokeDasharray={`${(forecast.probability / 100) * 314} 314`}
+                        strokeLinecap="round"
+                        className="transition-all duration-700"
                       />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className={`text-3xl font-golos font-bold ${probColor(forecast.probability)}`}>
+                        {forecast.probability}%
+                      </span>
                     </div>
-                    <div className="text-xs text-muted-foreground">{label}</div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {topTriggers.length > 0 && (
-            <div className="card-calm p-4">
-              <h3 className="font-golos font-semibold mb-3">Частые триггеры</h3>
-              <div className="space-y-2">
-                {topTriggers.map(([name, count]) => (
-                  <div key={name} className="flex items-center gap-3">
-                    <div className="text-sm flex-1">{name}</div>
-                    <div className="flex-1 bg-muted rounded-full h-2">
-                      <div className="bg-primary h-2 rounded-full" style={{ width: `${(count / topTriggers[0][1]) * 100}%` }} />
-                    </div>
-                    <div className="text-xs text-muted-foreground w-5 text-right">{count}</div>
+                  <div className="w-full bg-muted rounded-full h-2 mt-3 overflow-hidden">
+                    <div className={`h-2 rounded-full transition-all duration-700 ${probBg(forecast.probability)}`}
+                      style={{ width: `${forecast.probability}%` }} />
                   </div>
-                ))}
+                  <div className="flex justify-between w-full text-[10px] text-muted-foreground mt-1">
+                    <span>Низкая</span><span>Средняя</span><span>Высокая</span>
+                  </div>
+                </div>
               </div>
+
+              {/* Временное окно */}
+              <div className="card-calm p-4">
+                <h3 className="font-golos font-semibold mb-3 flex items-center gap-2">
+                  <Icon name="CalendarRange" size={17} className="text-primary" />
+                  Прогнозируемый период
+                </h3>
+                <div className="bg-muted/50 rounded-xl p-3 text-center">
+                  <div className="text-sm font-medium">{forecast.windowStart} — {forecast.windowEnd}</div>
+                  <div className="text-xs text-muted-foreground mt-1">предполагаемый временной интервал</div>
+                </div>
+              </div>
+
+              {/* Тип приступа */}
+              <div className="card-calm p-4">
+                <h3 className="font-golos font-semibold mb-3 flex items-center gap-2">
+                  <Icon name="Activity" size={17} className="text-primary" />
+                  Тип прогнозируемого приступа
+                </h3>
+                <div className="flex items-center gap-3 bg-primary/8 rounded-xl p-3">
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary flex-shrink-0" />
+                  <span className="text-sm font-medium">{forecast.predictedType}</span>
+                </div>
+              </div>
+
+              {/* Вероятные триггеры */}
+              {forecast.likelyTriggers.length > 0 && (
+                <div className="card-calm p-4">
+                  <h3 className="font-golos font-semibold mb-3 flex items-center gap-2">
+                    <Icon name="AlertTriangle" size={17} className="text-amber-500" />
+                    Вероятные триггеры
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {forecast.likelyTriggers.map(t => (
+                      <span key={t} className="px-3 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm rounded-xl font-medium">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Обоснование */}
+              <div className="card-calm p-4">
+                <h3 className="font-golos font-semibold mb-3 flex items-center gap-2">
+                  <Icon name="FileText" size={17} className="text-primary" />
+                  Обоснование прогноза
+                </h3>
+                <div className="space-y-2">
+                  {forecast.reasoning.map((r, i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0 mt-1.5" />
+                      <p className="text-sm text-muted-foreground leading-relaxed">{r}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="card-calm p-4 bg-muted/30">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  ⚠️ Прогноз носит информационный характер и основан на статистическом анализе ваших данных. Он не заменяет консультацию врача. При ухудшении состояния обратитесь к неврологу.
+                </p>
+              </div>
+
             </div>
           )}
-
-          <div className="card-calm p-4">
-            <h3 className="font-golos font-semibold mb-3">Типы приступов</h3>
-            <div className="space-y-2">
-              {Object.entries(typesCounts).map(([type, count]) => (
-                <div key={type} className="flex justify-between items-center">
-                  <span className="text-sm">{type}</span>
-                  <span className="text-sm font-medium text-primary">{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         </>
       )}
     </div>
