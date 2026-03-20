@@ -31,6 +31,17 @@ interface Contact {
 
 type Tab = "home" | "diary" | "meds" | "analytics" | "learn";
 
+interface Profile {
+  fullName: string;
+  birthDate: string;
+  email: string;
+  phone: string;
+  workplace: string;
+  school: string;
+  height: string;
+  weight: string;
+}
+
 // ─── Constants ─────────────────────────────────────────────────────────────
 const SEIZURE_TYPES = ["Генерализованный тонико-клонический", "Абсанс", "Фокальный", "Миоклонический", "Атонический", "Другой"];
 const TRIGGER_OPTIONS = ["Стресс", "Усталость", "Нарушение сна", "Яркий свет", "Мерцание", "Алкоголь", "Пропуск лекарства", "Менструация", "Жара", "Громкие звуки"];
@@ -717,6 +728,149 @@ function LearnTab() {
   );
 }
 
+// ─── Profile Screen ────────────────────────────────────────────────────────
+function ProfileScreen({ profile, setProfile, onClose }: {
+  profile: Profile;
+  setProfile: (v: Profile | ((p: Profile) => Profile)) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<Profile>(profile);
+
+  const save = () => {
+    setProfile(form);
+    onClose();
+  };
+
+  const f = (field: keyof Profile) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm(p => ({ ...p, [field]: e.target.value }));
+
+  const bmi = (() => {
+    const h = parseFloat(form.height) / 100;
+    const w = parseFloat(form.weight);
+    if (!h || !w || h <= 0) return null;
+    const val = w / (h * h);
+    let label = "";
+    if (val < 18.5) label = "Недостаточный вес";
+    else if (val < 25) label = "Норма";
+    else if (val < 30) label = "Избыточный вес";
+    else label = "Ожирение";
+    return { val: val.toFixed(1), label };
+  })();
+
+  const age = (() => {
+    if (!form.birthDate) return null;
+    const diff = Date.now() - new Date(form.birthDate).getTime();
+    return Math.floor(diff / (365.25 * 86400000));
+  })();
+
+  const inputCls = "w-full bg-muted/50 border border-border rounded-xl px-3 py-2.5 text-sm";
+  const labelCls = "text-xs text-muted-foreground block mb-1";
+
+  return (
+    <div className="fixed inset-0 z-40 bg-background flex flex-col max-w-md mx-auto animate-fade-in">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/50 px-4 py-3 flex items-center gap-3">
+        <button onClick={onClose} className="p-2 rounded-xl hover:bg-muted transition-colors">
+          <Icon name="ChevronLeft" size={20} className="text-muted-foreground" />
+        </button>
+        <h1 className="font-golos font-bold text-lg flex-1">Профиль</h1>
+        <button onClick={save} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium">
+          Сохранить
+        </button>
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-8">
+
+        {/* Аватар */}
+        <div className="flex flex-col items-center py-4">
+          <div className="w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center mb-2">
+            <Icon name="User" size={36} className="text-primary" />
+          </div>
+          {form.fullName && (
+            <div className="font-golos font-bold text-lg">{form.fullName}</div>
+          )}
+          {age !== null && (
+            <div className="text-sm text-muted-foreground">{age} лет</div>
+          )}
+        </div>
+
+        {/* Личная информация */}
+        <div className="card-calm p-4 space-y-3">
+          <h2 className="font-golos font-semibold flex items-center gap-2">
+            <Icon name="UserCircle" size={17} className="text-primary" />
+            Личная информация
+          </h2>
+          <div>
+            <label className={labelCls}>ФИО</label>
+            <input value={form.fullName} onChange={f("fullName")} placeholder="Иванов Иван Иванович" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Дата рождения</label>
+            <input type="date" value={form.birthDate} onChange={f("birthDate")} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>E-mail</label>
+            <input type="email" value={form.email} onChange={f("email")} placeholder="example@mail.ru" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Телефон</label>
+            <input type="tel" value={form.phone} onChange={f("phone")} placeholder="+7 (___) ___-__-__" className={inputCls} />
+          </div>
+        </div>
+
+        {/* Социально-бытовые сведения */}
+        <div className="card-calm p-4 space-y-3">
+          <h2 className="font-golos font-semibold flex items-center gap-2">
+            <Icon name="Briefcase" size={17} className="text-primary" />
+            Место работы и учёбы
+          </h2>
+          <div>
+            <label className={labelCls}>Место работы</label>
+            <input value={form.workplace} onChange={f("workplace")} placeholder="Название организации или сфера" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Место учёбы</label>
+            <input value={form.school} onChange={f("school")} placeholder="Образовательное учреждение" className={inputCls} />
+          </div>
+        </div>
+
+        {/* Антропометрия */}
+        <div className="card-calm p-4 space-y-3">
+          <h2 className="font-golos font-semibold flex items-center gap-2">
+            <Icon name="Activity" size={17} className="text-primary" />
+            Антропометрия
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Рост (см)</label>
+              <input type="number" value={form.height} onChange={f("height")} placeholder="170" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Вес (кг)</label>
+              <input type="number" value={form.weight} onChange={f("weight")} placeholder="70" className={inputCls} />
+            </div>
+          </div>
+
+          {bmi && (
+            <div className={`rounded-xl p-3 flex items-center justify-between ${
+              bmi.label === "Норма" ? "bg-green-500/10 border border-green-500/20" :
+              bmi.label === "Недостаточный вес" ? "bg-blue-500/10 border border-blue-500/20" :
+              "bg-amber-500/10 border border-amber-500/20"
+            }`}>
+              <div>
+                <div className="text-xs text-muted-foreground">Индекс массы тела (ИМТ)</div>
+                <div className="text-sm font-medium mt-0.5">{bmi.label}</div>
+              </div>
+              <div className="text-2xl font-golos font-bold text-primary">{bmi.val}</div>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ─── Contacts Manager ─────────────────────────────────────────────────────
 function ContactsManager({ contacts, setContacts }: { contacts: Contact[]; setContacts: (v: Contact[] | ((p: Contact[]) => Contact[])) => void }) {
   const [showForm, setShowForm] = useState(false);
@@ -774,9 +928,12 @@ function ContactsManager({ contacts, setContacts }: { contacts: Contact[]; setCo
 }
 
 // ─── Main App ──────────────────────────────────────────────────────────────
+const PROFILE_EMPTY: Profile = { fullName: "", birthDate: "", email: "", phone: "", workplace: "", school: "", height: "", weight: "" };
+
 export default function App() {
   const [tab, setTab] = useState<Tab>("home");
   const [sosVisible, setSOSVisible] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem("darkMode");
     return saved !== null ? JSON.parse(saved) : true;
@@ -786,6 +943,7 @@ export default function App() {
   const [seizures, setSeizures] = useLocalStorage<Seizure[]>("seizures", []);
   const [medications, setMedications] = useLocalStorage<Medication[]>("medications", []);
   const [contacts, setContacts] = useLocalStorage<Contact[]>("contacts", []);
+  const [profile, setProfile] = useLocalStorage<Profile>("profile", PROFILE_EMPTY);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
@@ -803,9 +961,22 @@ export default function App() {
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto">
       {sosVisible && <SOSScreen contacts={contacts} onClose={() => setSOSVisible(false)} />}
+      {profileOpen && <ProfileScreen profile={profile} setProfile={setProfile} onClose={() => setProfileOpen(false)} />}
 
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/50 px-4 py-3 flex items-center justify-between">
-        <h1 className="font-golos font-bold text-lg text-foreground">ЭпиКонтроль</h1>
+        {/* Иконка профиля */}
+        <button onClick={() => setProfileOpen(true)} className="flex items-center gap-2 p-1 rounded-xl hover:bg-muted transition-colors">
+          <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+            {profile.fullName
+              ? <span className="text-sm font-golos font-bold text-primary">{profile.fullName.charAt(0).toUpperCase()}</span>
+              : <Icon name="User" size={16} className="text-primary" />
+            }
+          </div>
+          {profile.fullName && (
+            <span className="text-sm font-medium text-foreground max-w-[120px] truncate">{profile.fullName.split(" ")[0]}</span>
+          )}
+        </button>
+
         <div className="flex items-center gap-2">
           <button onClick={() => setDarkMode((d: boolean) => !d)}
             className="p-2 rounded-xl hover:bg-muted transition-colors">
